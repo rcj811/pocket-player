@@ -48,6 +48,7 @@ sleep 10; playing; alive
 
 note "5 重新開啟"
 adb shell am start -W -n $PKG/.MainActivity; sleep 6; shot 5-reopen; playing; alive
+adb shell input tap 540 2280; sleep 3; shot 5b-tab-list
 
 note "6 強制關閉後重新開啟（還原清單）"
 adb shell am force-stop $PKG; sleep 2

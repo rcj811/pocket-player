@@ -123,7 +123,7 @@ private val colors = darkColorScheme(
 fun AppRoot(a: MainActivity) {
     MaterialTheme(colorScheme = colors) {
         var tab by remember { mutableIntStateOf(0) }
-        LaunchedEffect(tab) { if (tab == 0) a.stopPreview() }
+        LaunchedEffect(tab) { if (tab != 2) a.stopPreview() }
         val snackbar = remember { SnackbarHostState() }
         val msg = a.player.message
         LaunchedEffect(msg) {
@@ -153,7 +153,7 @@ fun AppRoot(a: MainActivity) {
                 bottomBar = {
                     Column(Modifier.background(Color(0xFF0E0C18))) {
                         if (tab == 0) ControlDock(a)
-                        if (tab == 1 && a.player.queue.isNotEmpty()) MiniPlayer(a) { tab = 0 }
+                        if (tab != 0 && a.player.queue.isNotEmpty()) MiniPlayer(a) { tab = 0 }
                         NavigationBar(containerColor = Color.Transparent) {
                             val itemColors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = Pink, selectedTextColor = Pink,
@@ -166,13 +166,21 @@ fun AppRoot(a: MainActivity) {
                             )
                             NavigationBarItem(
                                 selected = tab == 1, onClick = { tab = 1 }, colors = itemColors,
+                                icon = { Icon(painterResource(R.drawable.ic_queue), null) }, label = { Text("清單") },
+                            )
+                            NavigationBarItem(
+                                selected = tab == 2, onClick = { tab = 2 }, colors = itemColors,
                                 icon = { Icon(Icons.Default.Search, null) }, label = { Text("搜尋") },
                             )
                         }
                     }
                 },
             ) { pad ->
-                if (tab == 0) PlayerScreen(a, pad) else SearchScreen(a, pad)
+                when (tab) {
+                    0 -> PlayerScreen(a, pad)
+                    1 -> QueueScreen(a, pad)
+                    else -> SearchScreen(a, pad)
+                }
             }
             Dialogs(a)
         }
@@ -301,6 +309,22 @@ private fun Dialogs(a: MainActivity) {
 
 @Composable
 fun PlayerScreen(a: MainActivity, pad: PaddingValues) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(start = 20.dp, end = 20.dp, top = pad.calculateTopPadding() + 8.dp, bottom = pad.calculateBottomPadding() + 16.dp),
+    ) {
+        Header(a)
+        Spacer(Modifier.height(20.dp))
+        NowPlaying(a)
+    }
+}
+
+// ============================ 清單頁（YouTube 網址＋播放清單） ============================
+
+@Composable
+fun QueueScreen(a: MainActivity, pad: PaddingValues) {
     val s = a.player
     LazyColumn(
         Modifier.fillMaxSize().imePadding(),
@@ -309,7 +333,9 @@ fun PlayerScreen(a: MainActivity, pad: PaddingValues) {
             top = pad.calculateTopPadding() + 8.dp, bottom = pad.calculateBottomPadding() + 24.dp,
         ),
     ) {
-        item { Header(a) }
+        item {
+            Text("清單", fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(bottom = 12.dp))
+        }
         if (!a.notifOff && a.showStatusTip && s.queue.isNotEmpty()) item {
             Surface(color = Card, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
                 Column(Modifier.padding(14.dp)) {
@@ -347,7 +373,6 @@ fun PlayerScreen(a: MainActivity, pad: PaddingValues) {
                 }
             }
         }
-        item { NowPlaying(a) }
         item { AddBar(a) }
         item {
             Row(Modifier.padding(top = 24.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
