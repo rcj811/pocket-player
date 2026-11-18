@@ -386,7 +386,7 @@ private fun NowPlaying(a: MainActivity) {
         } else {
             Box(
                 Modifier
-                    .fillMaxWidth(0.78f)
+                    .fillMaxWidth(0.66f)
                     .aspectRatio(1f)
                     .scale(scale)
                     .shadow(24.dp, RoundedCornerShape(28.dp))
