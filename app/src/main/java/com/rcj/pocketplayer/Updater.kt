@@ -23,7 +23,13 @@ object Updater {
     private const val REPO = "rcj811/pocket-player"
     private const val APK_NAME = "pocket-player.apk"
 
-    data class Release(val build: Int, val apkUrl: String, val notes: String)
+    data class Release(val build: Int, val apkUrl: String, val notes: String) {
+        val version get() = versionOf(build.toLong())
+    }
+
+    fun versionOf(build: Long) = "v1.0.$build"
+
+    fun currentVersion(context: Context) = versionOf(currentBuild(context))
 
     private val client by lazy {
         OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS).readTimeout(15, TimeUnit.SECONDS).build()
@@ -52,7 +58,12 @@ object Updater {
                 val a = assets.getJSONObject(i)
                 if (a.optString("name") == APK_NAME) url = a.optString("browser_download_url")
             }
-            Release(build, url ?: return null, json.optString("body"))
+            val notes = json.optString("body")
+                .lines()
+                .filterNot { it.startsWith("## ") }
+                .joinToString("\n") { it.removePrefix("### ") }
+                .trim()
+            Release(build, url ?: return null, notes)
         }
     } catch (_: Exception) {
         null

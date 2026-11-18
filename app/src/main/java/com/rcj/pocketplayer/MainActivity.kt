@@ -203,12 +203,15 @@ class MainActivity : ComponentActivity() {
 
     // ---------------- 更新檢查 ----------------
 
-    private fun checkForUpdate() {
+    fun checkForUpdate(manual: Boolean = false) {
         lifecycleScope.launch {
             val r = withContext(Dispatchers.IO) { Updater.checkNewer(this@MainActivity) }
             if (r != null) update = r
+            else if (manual) player.message = "已是最新版本 ${Updater.currentVersion(this@MainActivity)} ✓"
         }
     }
+
+    val versionText: String by lazy { Updater.currentVersion(this) }
 
     fun startUpdate() {
         val r = update ?: return

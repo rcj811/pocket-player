@@ -18,6 +18,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-java@v4
         with:
@@ -71,6 +73,21 @@ jobs:
         id: names
         run: |
           echo "np=$(grep -oP 'NewPipeExtractor:\K[^"]+' app/build.gradle.kts)" >> "$GITHUB_OUTPUT"
+          # 更新內容：上一版到這一版之間的所有修改
+          PREV=$(git tag -l 'build-*' --sort=-v:refname | head -1)
+          {
+            echo "## 隨身聽 v1.0.${{ github.run_number }}"
+            echo
+            echo "### 更新內容"
+            if [ -n "$PREV" ]; then
+              git log "$PREV"..HEAD --no-merges --pretty='- %s' | grep -v '^- CI ' || echo "- 例行重新編譯"
+            else
+              git log -1 --pretty='- %s'
+            fi
+            echo
+            echo "YouTube 解析引擎：NewPipeExtractor $(grep -oP 'NewPipeExtractor:\K[^"]+' app/build.gradle.kts)"
+          } > notes.md
+          cat notes.md
           cp app/build/outputs/apk/release/app-release.apk "pocket-player-${{ github.run_number }}.apk"
           cp app/build/outputs/apk/release/app-release.apk pocket-player.apk
 
@@ -83,10 +100,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: 隨身聽 build ${{ github.run_number }}
-          body: |
-            YouTube 解析引擎 NewPipeExtractor ${{ steps.names.outputs.np }}
-            ${{ github.event.head_commit.message || '自動更新' }}
+          name: 隨身聽 v1.0.${{ github.run_number }}
+          body_path: notes.md
           files: |
             pocket-player-${{ github.run_number }}.apk
             pocket-player.apk

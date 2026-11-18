@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -36,6 +37,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -258,8 +260,17 @@ private fun Dialogs(a: MainActivity) {
     AlertDialog(
         onDismissRequest = { a.update = null },
         icon = { Icon(painterResource(R.drawable.ic_download), null, tint = Pink) },
-        title = { Text("有新版本 build ${u.build}") },
-        text = { Text(u.notes.ifBlank { "包含最新的 YouTube 解析引擎與修正。" }, fontSize = 14.sp) },
+        title = { Text("有新版本 ${u.version}") },
+        text = {
+            Column {
+                Text("目前版本 ${a.versionText}", color = Muted, fontSize = 13.sp)
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    u.notes.ifBlank { "包含最新的 YouTube 解析引擎與修正。" }, fontSize = 14.sp,
+                    modifier = Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState()),
+                )
+            }
+        },
         confirmButton = {
             Button(onClick = a::startUpdate, colors = ButtonDefaults.buttonColors(containerColor = Pink)) {
                 Text("立即更新", fontWeight = FontWeight.Bold)
@@ -329,7 +340,11 @@ private fun Header(a: MainActivity) {
     var menu by remember { mutableStateOf(false) }
     Row(Modifier.fillMaxWidth().padding(bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text("隨身聽", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text("隨身聽", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
+                Spacer(Modifier.width(8.dp))
+                Text(a.versionText, color = Muted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 5.dp))
+            }
             Text("YouTube・MP3・MP4　關螢幕也照常播放", color = Muted, fontSize = 12.sp)
         }
         Box {
@@ -349,6 +364,11 @@ private fun Header(a: MainActivity) {
                     text = { Text("允許背景播放（關閉省電限制）") },
                     leadingIcon = { Icon(painterResource(R.drawable.ic_run), null) },
                     onClick = { menu = false; a.openBatterySettings() },
+                )
+                DropdownMenuItem(
+                    text = { Text("檢查更新（目前 ${a.versionText}）") },
+                    leadingIcon = { Icon(Icons.Default.Refresh, null) },
+                    onClick = { menu = false; a.checkForUpdate(manual = true) },
                 )
                 DropdownMenuItem(
                     text = { Text("清空播放清單") },
