@@ -5,7 +5,7 @@ PKG=com.rcj.pocketplayer
 OUT=smoke
 mkdir -p $OUT
 note() { echo "### $*" | tee -a $OUT/steps.txt; }
-playing() { adb shell dumpsys media_session | grep -m1 -oE "state=PlaybackState \{state=[0-9]+" | tee -a $OUT/steps.txt; }
+playing() { echo "播放狀態: $(adb shell dumpsys media_session | grep -A40 'pocketplayer' | grep -m1 -oE 'state=[A-Z_]+\([0-9]+\)')" | tee -a $OUT/steps.txt; }
 alive() { echo "pid=$(adb shell pidof $PKG)" | tee -a $OUT/steps.txt; }
 shot() { adb exec-out screencap -p > $OUT/$1.png; }
 
@@ -53,5 +53,7 @@ adb shell am start -W -n $PKG/.MainActivity; sleep 8; shot 6-restart; alive
 
 adb logcat -d > $OUT/logcat.txt
 { grep -nE "FATAL EXCEPTION|AndroidRuntime|ExoPlayerImplInternal|MediaSessionService|$PKG" $OUT/logcat.txt | grep -vE "^.*D/" | head -300; } > $OUT/important.txt
-grep -c "FATAL EXCEPTION" $OUT/logcat.txt | tee -a $OUT/steps.txt
+echo "閃退次數: $(grep -c 'FATAL EXCEPTION' $OUT/logcat.txt)" | tee -a $OUT/steps.txt
+echo "播放器操作失敗: $(grep -c 'Session operation failed' $OUT/logcat.txt)" | tee -a $OUT/steps.txt
+grep -E "Caused by|pocketplayer\.[A-Za-z]+\.|E ExoPlayer" $OUT/logcat.txt | head -40 > $OUT/causes.txt
 exit 0

@@ -191,16 +191,22 @@ class PlaybackService : MediaSessionService() {
 
     /** 預先下載接下來 2 首到快取，就算跑到沒訊號的地方也不會斷。 */
     private fun precacheUpcoming() {
-        if (player.mediaItemCount == 0) return
-        val ids = ArrayList<String>()
-        var idx = player.currentMediaItemIndex
-        // 目前這首也確保完整下載
-        Media.ytIdOf(player.getMediaItemAt(idx))?.let { ids += it }
-        repeat(2) {
-            idx = player.currentTimeline.getNextWindowIndex(idx, player.repeatMode.takeIf { it != Player.REPEAT_MODE_ONE } ?: Player.REPEAT_MODE_OFF, player.shuffleModeEnabled)
-            if (idx != C.INDEX_UNSET) Media.ytIdOf(player.getMediaItemAt(idx))?.let { ids += it }
+        // 延後到事件處理完再算，且任何錯誤都不能讓播放器崩潰
+        main.post {
+            try {
+                val count = player.mediaItemCount
+                val cur = player.currentMediaItemIndex
+                if (count == 0 || cur !in 0 until count) return@post
+                val ids = ArrayList<String>()
+                Media.ytIdOf(player.getMediaItemAt(cur))?.let { ids += it }
+                for (k in 1..2) {
+                    val i = if (player.repeatMode == Player.REPEAT_MODE_ALL) (cur + k) % count else cur + k
+                    if (i in 0 until count && i != cur) Media.ytIdOf(player.getMediaItemAt(i))?.let { ids += it }
+                }
+                if (ids.isNotEmpty()) MediaCache.precache(this, ids)
+            } catch (_: Exception) {
+            }
         }
-        if (ids.isNotEmpty()) MediaCache.precache(this, ids)
     }
 
     // ---------------- 從畫面加入的歌曲 ----------------
