@@ -1,0 +1,36 @@
+name: 自動升級 NewPipe 引擎
+
+# 每天檢查 NewPipeExtractor 有沒有新版；有就升級並重新編譯 APK，
+# App 下次開啟時就會跳出更新提示。
+on:
+  schedule:
+    - cron: "17 2 * * *"   # 每天台灣時間 10:17
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 檢查並升級
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          LATEST=$(gh api repos/TeamNewPipe/NewPipeExtractor/releases/latest --jq .tag_name)
+          CURRENT=$(grep -oP 'NewPipeExtractor:\K[^"]+' app/build.gradle.kts)
+          echo "目前 $CURRENT，最新 $LATEST"
+          if [ -z "$LATEST" ] || [ "$LATEST" = "$CURRENT" ]; then
+            echo "已是最新"; exit 0
+          fi
+          sed -i "s/NewPipeExtractor:$CURRENT/NewPipeExtractor:$LATEST/" app/build.gradle.kts
+          git config user.name "ci-bot"
+          git config user.email "ci-bot@users.noreply.github.com"
+          git commit -am "升級 YouTube 解析引擎 NewPipeExtractor $CURRENT → $LATEST"
+          git push origin HEAD:main
+          # GITHUB_TOKEN 的 push 不會觸發其他 workflow，所以手動叫編譯
+          gh workflow run build-apk.yml --ref main
