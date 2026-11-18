@@ -40,6 +40,8 @@ sleep 3
 adb shell input keyevent KEYCODE_MEDIA_NEXT
 sleep 15; shot 3-mp4; playing; alive
 
+echo "通知: $(adb shell dumpsys notification --noredact | grep -A4 'pkg=com.rcj.pocketplayer' | grep -m1 -oE 'importance=[0-9]+|channel=[a-z_]+' | tr '\n' ' ')" | tee -a $OUT/steps.txt
+adb shell dumpsys notification --noredact | grep -B2 -A12 'pkg=com.rcj.pocketplayer' > $OUT/notification.txt
 note "4 回桌面（背景播放）"
 adb shell input keyevent KEYCODE_HOME
 sleep 10; playing; alive

@@ -148,9 +148,11 @@ fun AppRoot(a: MainActivity) {
             }
             Scaffold(
                 containerColor = Color.Transparent,
+                contentColor = Color.White,
                 snackbarHost = { SnackbarHost(snackbar) },
                 bottomBar = {
-                    Column(Modifier.background(Color(0xF00E0C18))) {
+                    Column(Modifier.background(Color(0xF20E0C18))) {
+                        if (tab == 0) ControlDock(a)
                         if (tab == 1 && a.player.queue.isNotEmpty()) MiniPlayer(a) { tab = 0 }
                         NavigationBar(containerColor = Color.Transparent) {
                             val itemColors = NavigationBarItemDefaults.colors(
@@ -294,8 +296,6 @@ fun PlayerScreen(a: MainActivity, pad: PaddingValues) {
     ) {
         item { Header(a) }
         item { NowPlaying(a) }
-        item { Progress(a) }
-        item { Controls(a) }
         item { AddBar(a) }
         item {
             Row(Modifier.padding(top = 24.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -335,6 +335,15 @@ fun PlayerScreen(a: MainActivity, pad: PaddingValues) {
     }
 }
 
+/** 固定在底部的進度條＋播放鍵：跑步時不用捲動就按得到。 */
+@Composable
+private fun ControlDock(a: MainActivity) {
+    Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 2.dp)) {
+        Progress(a)
+        Controls(a)
+    }
+}
+
 @Composable
 private fun Header(a: MainActivity) {
     var menu by remember { mutableStateOf(false) }
@@ -345,7 +354,7 @@ private fun Header(a: MainActivity) {
                 Spacer(Modifier.width(8.dp))
                 Text(a.versionText, color = Muted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 5.dp))
             }
-            Text("YouTube・MP3・MP4　關螢幕也照常播放", color = Muted, fontSize = 12.sp)
+            Text("YouTube・MP3・MP4", color = Muted, fontSize = 12.sp, maxLines = 1)
         }
         Box {
             IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "選單") }
@@ -452,7 +461,7 @@ private fun Progress(a: MainActivity) {
     }
     val dur = s.durationMs
     val fraction = if (dur > 0) (pos.toFloat() / dur).coerceIn(0f, 1f) else 0f
-    Column(Modifier.padding(top = 16.dp)) {
+    Column {
         Slider(
             value = if (dragging) dragValue else fraction,
             onValueChange = { dragging = true; dragValue = it },
@@ -481,7 +490,7 @@ private fun Progress(a: MainActivity) {
 private fun Controls(a: MainActivity) {
     val s = a.player
     Row(
-        Modifier.fillMaxWidth().padding(top = 8.dp),
+        Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -493,8 +502,8 @@ private fun Controls(a: MainActivity) {
         }
         Box(
             Modifier
-                .size(78.dp)
-                .shadow(16.dp, CircleShape)
+                .size(68.dp)
+                .shadow(12.dp, CircleShape)
                 .clip(CircleShape)
                 .background(Brush.linearGradient(listOf(Pink, Violet)))
                 .clickable { a.togglePlay() },

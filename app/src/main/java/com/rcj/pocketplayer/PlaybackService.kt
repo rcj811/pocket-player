@@ -1,5 +1,8 @@
 package com.rcj.pocketplayer
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -20,6 +23,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
 import androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy
+import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.google.common.util.concurrent.Futures
@@ -28,6 +32,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 class PlaybackService : MediaSessionService() {
+
+    companion object {
+        const val CHANNEL_ID = "playing"
+    }
 
     private var session: MediaSession? = null
     private lateinit var player: ExoPlayer
@@ -38,6 +46,7 @@ class PlaybackService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
+        setupNotification()
 
         // 跑步不卡頓：音樂盡量整首先緩衝（最多 10 分鐘），但總量限制 40MB，
         // 避免 MP4 影片把記憶體吃光而閃退
@@ -86,6 +95,32 @@ class PlaybackService : MediaSessionService() {
             connectivity?.registerDefaultNetworkCallback(networkCallback)
         } catch (_: Exception) {
         }
+    }
+
+    /**
+     * 通知頻道設為「預設」重要性（但無聲、不震動），
+     * 這樣狀態列會一直顯示音符圖示，看得出隨身聽正在播放。
+     * （Media3 預設是靜音通知，很多手機不會在狀態列顯示圖示）
+     */
+    private fun setupNotification() {
+        val nm = getSystemService(NotificationManager::class.java)
+        if (nm.getNotificationChannel(CHANNEL_ID) == null) {
+            val ch = NotificationChannel(CHANNEL_ID, "播放中", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = "顯示正在播放的歌曲與控制按鈕"
+                setSound(null, null)
+                enableVibration(false)
+                enableLights(false)
+                setShowBadge(false)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            }
+            nm.createNotificationChannel(ch)
+        }
+        val provider = DefaultMediaNotificationProvider.Builder(this)
+            .setChannelId(CHANNEL_ID)
+            .setChannelName(R.string.channel_playing)
+            .build()
+        provider.setSmallIcon(R.drawable.ic_music)
+        setMediaNotificationProvider(provider)
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session

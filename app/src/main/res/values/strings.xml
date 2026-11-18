@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">隨身聽</string>
+    <string name="channel_playing">播放中</string>
 </resources>
