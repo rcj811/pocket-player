@@ -151,7 +151,7 @@ fun AppRoot(a: MainActivity) {
                 contentColor = Color.White,
                 snackbarHost = { SnackbarHost(snackbar) },
                 bottomBar = {
-                    Column(Modifier.background(Color(0xF20E0C18))) {
+                    Column(Modifier.background(Color(0xFF0E0C18))) {
                         if (tab == 0) ControlDock(a)
                         if (tab == 1 && a.player.queue.isNotEmpty()) MiniPlayer(a) { tab = 0 }
                         NavigationBar(containerColor = Color.Transparent) {
