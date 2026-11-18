@@ -24,11 +24,15 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
@@ -117,6 +121,7 @@ private val colors = darkColorScheme(
 fun AppRoot(a: MainActivity) {
     MaterialTheme(colorScheme = colors) {
         var tab by remember { mutableIntStateOf(0) }
+        LaunchedEffect(tab) { if (tab == 0) a.stopPreview() }
         val snackbar = remember { SnackbarHostState() }
         val msg = a.player.message
         LaunchedEffect(msg) {
@@ -174,6 +179,64 @@ fun AppRoot(a: MainActivity) {
 
 @Composable
 private fun Dialogs(a: MainActivity) {
+    a.crashLog?.let { log ->
+        val clipboard = LocalClipboardManager.current
+        AlertDialog(
+            onDismissRequest = a::dismissCrash,
+            title = { Text("上次發生錯誤而關閉") },
+            text = {
+                Column {
+                    Text("已自動清空播放清單，確保 App 能正常開啟。可以按「複製錯誤」貼給開發者。", fontSize = 13.sp, color = Muted)
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        log, fontSize = 10.sp, lineHeight = 13.sp,
+                        modifier = Modifier.height(220.dp).verticalScroll(rememberScrollState()),
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { clipboard.setText(AnnotatedString(log)); a.dismissCrash() },
+                    colors = ButtonDefaults.buttonColors(containerColor = Pink),
+                ) { Text("複製錯誤") }
+            },
+            dismissButton = { TextButton(onClick = a::dismissCrash) { Text("關閉", color = Muted) } },
+        )
+        return
+    }
+    a.folderOffer?.let { offer ->
+        AlertDialog(
+            onDismissRequest = { a.folderOffer = null },
+            icon = { Icon(painterResource(R.drawable.ic_folder), null, tint = Pink) },
+            title = { Text("「${offer.folderName}」共 ${offer.files.size} 首") },
+            text = {
+                Column {
+                    Text("音樂 ${offer.audioCount} 首・影片 ${offer.videoCount} 部", fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(8.dp))
+                    offer.files.take(6).forEach {
+                        Text("・${it.name}", fontSize = 13.sp, color = Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    if (offer.files.size > 6) Text("…還有 ${offer.files.size - 6} 首", fontSize = 13.sp, color = Muted)
+                    Spacer(Modifier.height(8.dp))
+                    Text("要加入播放清單嗎？（不會打斷正在播放的歌）", fontSize = 13.sp)
+                }
+            },
+            confirmButton = {
+                Button(onClick = { a.acceptFolder(onlyAudio = false) }, colors = ButtonDefaults.buttonColors(containerColor = Pink)) {
+                    Text("全部加入", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                Row {
+                    if (offer.videoCount > 0 && offer.audioCount > 0) {
+                        TextButton(onClick = { a.acceptFolder(onlyAudio = true) }) { Text("只加音樂") }
+                    }
+                    TextButton(onClick = { a.folderOffer = null }) { Text("取消", color = Muted) }
+                }
+            },
+        )
+        return
+    }
     if (a.showWelcome) {
         AlertDialog(
             onDismissRequest = {},
@@ -235,7 +298,7 @@ fun PlayerScreen(a: MainActivity, pad: PaddingValues) {
         if (s.queue.isEmpty()) {
             item {
                 Text(
-                    "還沒有歌曲\n貼上 YouTube 網址、到「搜尋」找歌，或加入手機裡的 MP3 / MP4",
+                    "還沒有歌曲\n貼上 YouTube 網址、到「搜尋」找歌，或選手機裡的音樂資料夾",
                     color = Muted, textAlign = TextAlign.Center, fontSize = 14.sp,
                     modifier = Modifier.fillMaxWidth().padding(vertical = 28.dp),
                 )
@@ -272,6 +335,11 @@ private fun Header(a: MainActivity) {
         Box {
             IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "選單") }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                DropdownMenuItem(
+                    text = { Text("加入單一檔案（MP3 / MP4）") },
+                    leadingIcon = { Icon(painterResource(R.drawable.ic_music), null) },
+                    onClick = { menu = false; a.pickFiles.launch(arrayOf("audio/*", "video/*")) },
+                )
                 DropdownMenuItem(
                     text = { Text("離線下載整個清單") },
                     leadingIcon = { Icon(painterResource(R.drawable.ic_download), null) },
@@ -489,13 +557,18 @@ private fun AddBar(a: MainActivity) {
                     }
                 }
                 OutlinedButton(
-                    onClick = { a.pickFiles.launch(arrayOf("audio/*", "video/*")) },
+                    onClick = { a.pickFolder.launch(null) },
+                    enabled = !a.scanning,
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.weight(1f).height(46.dp),
                 ) {
-                    Icon(painterResource(R.drawable.ic_folder), null, modifier = Modifier.size(18.dp))
+                    if (a.scanning) {
+                        CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+                    } else {
+                        Icon(painterResource(R.drawable.ic_folder), null, modifier = Modifier.size(18.dp))
+                    }
                     Spacer(Modifier.width(6.dp))
-                    Text("MP3 / MP4")
+                    Text("本機資料夾")
                 }
             }
         }
@@ -586,6 +659,10 @@ private fun MiniPlayer(a: MainActivity, onOpen: () -> Unit) {
 @Composable
 fun SearchScreen(a: MainActivity, pad: PaddingValues) {
     val st = a.search
+    if (st.openList != null) {
+        ListDetail(a, pad)
+        return
+    }
     val focus = LocalFocusManager.current
     val listState: LazyListState = rememberLazyListState()
     val results = st.visible()
@@ -660,7 +737,7 @@ fun SearchScreen(a: MainActivity, pad: PaddingValues) {
             }
             !st.searched -> item {
                 Text(
-                    "提示：點「運動快選」一鍵找跑步音樂；「歌單」可整張加入。\n點歌曲＝立即播放，按 ＋＝加到清單。",
+                    "提示：點「運動快選」一鍵找跑步音樂。\n點歌曲＝試聽（亮起的那首），按 ＋ 才加入清單；點專輯 / 歌單可展開曲目。",
                     color = Muted, fontSize = 13.sp, modifier = Modifier.padding(vertical = 20.dp),
                 )
             }
@@ -668,21 +745,8 @@ fun SearchScreen(a: MainActivity, pad: PaddingValues) {
 
         if (!st.loading) {
             itemsIndexed(results, key = { i, r -> "${r.id}-$i" }) { _, r ->
-                val sub = buildString {
-                    append(if (r.isPlaylist) "歌單" else r.subtitle)
-                    if (r.isPlaylist && r.subtitle.isNotBlank()) append(" · ").append(r.subtitle)
-                    if (!r.isPlaylist && r.durationSec > 0) append(" · ").append(Links.formatDuration(r.durationSec * 1000))
-                }
-                TrackRow(
-                    title = r.title, subtitle = sub, thumb = r.thumb,
-                    current = false, playing = false, offline = false,
-                    onClick = { a.addResult(r, playNow = true) },
-                    trailing = {
-                        IconButton(onClick = { a.addResult(r, playNow = false) }) {
-                            Icon(Icons.Default.Add, "加入清單", tint = Pink)
-                        }
-                    },
-                )
+                val listLabel = if (st.kind == YouTube.Kind.ALBUMS) "專輯" else "歌單"
+                ResultRow(a, r, if (r.isPlaylist) listLabel else null)
             }
             if (st.loadingMore) item {
                 Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
@@ -690,6 +754,89 @@ fun SearchScreen(a: MainActivity, pad: PaddingValues) {
                 }
             }
         }
+    }
+}
+
+/** 搜尋結果一列：歌曲點一下試聽（光棒），＋ 加入；專輯 / 歌單點一下展開。 */
+@Composable
+private fun ResultRow(a: MainActivity, r: YouTube.Result, listLabel: String?) {
+    val st = a.search
+    val previewing = !r.isPlaylist && st.previewId == r.id
+    val sub = buildString {
+        if (listLabel != null) {
+            append(listLabel)
+            if (r.subtitle.isNotBlank()) append(" · ").append(r.subtitle)
+        } else {
+            if (previewing) append(if (st.previewLoading) "載入試聽中… · " else "試聽中 · ")
+            append(r.subtitle)
+            if (r.durationSec > 0) append(" · ").append(Links.formatDuration(r.durationSec * 1000))
+        }
+    }
+    TrackRow(
+        title = r.title, subtitle = sub, thumb = r.thumb,
+        current = previewing, playing = previewing && !st.previewLoading, offline = false,
+        onClick = { if (r.isPlaylist) a.openList(r) else a.togglePreview(r) },
+        trailing = {
+            IconButton(onClick = { a.addResult(r) }) {
+                Icon(Icons.Default.Add, "加入清單", tint = Pink)
+            }
+        },
+    )
+}
+
+/** 專輯 / 歌單展開頁 */
+@Composable
+private fun ListDetail(a: MainActivity, pad: PaddingValues) {
+    val st = a.search
+    val list = st.openList ?: return
+    BackHandler { a.stopPreview(); a.closeList() }
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            start = 16.dp, end = 16.dp,
+            top = pad.calculateTopPadding() + 8.dp, bottom = pad.calculateBottomPadding() + 16.dp,
+        ),
+    ) {
+        item {
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { a.stopPreview(); a.closeList() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                    }
+                    Text("返回搜尋結果", color = Muted, fontSize = 14.sp)
+                }
+                Row(Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(96.dp).clip(RoundedCornerShape(16.dp)).background(Card)) {
+                        if (list.thumb != null) {
+                            AsyncImage(list.thumb, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                        }
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(list.title, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(list.subtitle, color = Muted, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Spacer(Modifier.height(8.dp))
+                        Button(
+                            onClick = a::addAllTracks,
+                            enabled = st.tracks.isNotEmpty(),
+                            colors = ButtonDefaults.buttonColors(containerColor = Pink),
+                            shape = RoundedCornerShape(12.dp),
+                        ) {
+                            Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("全部加入（${st.tracks.size} 首）")
+                        }
+                    }
+                }
+                Text("點歌曲試聽，按 ＋ 單首加入", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 4.dp))
+            }
+        }
+        if (st.tracksLoading) item {
+            Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = Pink)
+            }
+        }
+        itemsIndexed(st.tracks, key = { i, r -> "${r.id}-$i" }) { _, r -> ResultRow(a, r, null) }
     }
 }
 

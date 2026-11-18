@@ -20,7 +20,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.PlaybackException
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
@@ -109,6 +113,15 @@ class SearchState {
     var searched by mutableStateOf(false)
     var page: YouTube.SearchPage? = null
 
+    /** 展開中的專輯 / 歌單 */
+    var openList by mutableStateOf<YouTube.Result?>(null)
+    var tracks by mutableStateOf<List<YouTube.Result>>(emptyList())
+    var tracksLoading by mutableStateOf(false)
+
+    /** 試聽中的歌（光棒） */
+    var previewId by mutableStateOf<String?>(null)
+    var previewLoading by mutableStateOf(false)
+
     fun visible(): List<YouTube.Result> {
         val r = duration.range ?: return results
         return results.filter { it.isPlaylist || it.durationSec <= 0 || it.durationSec in r }
@@ -137,11 +150,27 @@ class MainActivity : ComponentActivity() {
         if (uris.isNotEmpty()) addLocal(uris, persist = true)
     }
 
+    /** 選資料夾 → 掃描 → 詢問要不要加入 */
+    var folderOffer by mutableStateOf<LocalScan.Offer?>(null)
+    var scanning by mutableStateOf(false)
+    val pickFolder = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { tree ->
+        if (tree != null) scanFolder(tree)
+    }
+
+    /** 上次閃退的錯誤內容（顯示給使用者回報） */
+    var crashLog by mutableStateOf<String?>(null)
+
+    // 畫面在背景時（例如正在選檔案）先暫存，連上播放器後再加入，不會打斷正在播的歌
+    private val pendingItems = ArrayList<MediaItem>()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         pendingIntent = intent
         showWelcome = !allPermissionsReady()
+        App.crashFile(this).takeIf { it.exists() }?.let { f ->
+            crashLog = try { f.readText() } catch (_: Exception) { "（無法讀取錯誤內容）" }
+        }
         setContent { AppRoot(this) }
         checkForUpdate()
     }
@@ -210,11 +239,17 @@ class MainActivity : ComponentActivity() {
                 return@addListener
             }
             player.attach(c)
+            if (pendingItems.isNotEmpty()) {
+                val items = ArrayList(pendingItems)
+                pendingItems.clear()
+                appendItems(items)
+            }
             handlePendingIntent()
         }, ContextCompat.getMainExecutor(this))
     }
 
     override fun onStop() {
+        stopPreview()
         player.detach()
         controllerFuture?.let { MediaController.releaseFuture(it) }
         controllerFuture = null
@@ -245,7 +280,92 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    fun addResult(r: YouTube.Result, playNow: Boolean) {
+    // ---------------- 試聽（不加入清單） ----------------
+
+    private var previewPlayer: ExoPlayer? = null
+
+    private fun previewPlayer(): ExoPlayer = previewPlayer ?: ExoPlayer.Builder(this)
+        .setMediaSourceFactory(DefaultMediaSourceFactory(MediaCache.playerFactory(this)))
+        .setAudioAttributes(
+            AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(),
+            true,
+        )
+        .build()
+        .also { p ->
+            p.addListener(object : Player.Listener {
+                override fun onPlaybackStateChanged(state: Int) {
+                    search.previewLoading = state == Player.STATE_BUFFERING
+                    if (state == Player.STATE_ENDED) search.previewId = null
+                }
+
+                override fun onPlayerError(error: PlaybackException) {
+                    search.previewId = null
+                    search.previewLoading = false
+                    player.message = "這首無法試聽"
+                }
+            })
+            previewPlayer = p
+        }
+
+    /** 點一下試聽，再點一下停止。 */
+    fun togglePreview(r: YouTube.Result) {
+        if (search.previewId == r.id) {
+            stopPreview()
+            return
+        }
+        player.controller?.pause()
+        val p = previewPlayer()
+        p.setMediaItem(Media.youtube(r.id, r.title, r.subtitle))
+        p.prepare()
+        p.play()
+        search.previewId = r.id
+        search.previewLoading = true
+    }
+
+    fun stopPreview() {
+        previewPlayer?.run {
+            stop()
+            clearMediaItems()
+        }
+        search.previewId = null
+        search.previewLoading = false
+    }
+
+    override fun onDestroy() {
+        previewPlayer?.release()
+        previewPlayer = null
+        super.onDestroy()
+    }
+
+    // ---------------- 專輯 / 歌單展開 ----------------
+
+    fun openList(r: YouTube.Result) {
+        search.openList = r
+        search.tracks = emptyList()
+        search.tracksLoading = true
+        lifecycleScope.launch {
+            try {
+                search.tracks = withContext(Dispatchers.IO) { YouTube.playlistTracks(r.id) }
+            } catch (e: Exception) {
+                player.message = "無法讀取：${e.message ?: e.javaClass.simpleName}"
+            } finally {
+                search.tracksLoading = false
+            }
+        }
+    }
+
+    fun closeList() {
+        search.openList = null
+        search.tracks = emptyList()
+    }
+
+    fun addAllTracks() {
+        val list = search.tracks
+        if (list.isEmpty()) return
+        appendItems(list.map { Media.youtube(it.id, it.title, it.subtitle) })
+    }
+
+    fun addResult(r: YouTube.Result, playNow: Boolean = false) {
         if (r.isPlaylist) {
             loadAndAdd("讀取歌單…", playNow) { YouTube.loadPlaylist(r.id) }
         } else {
@@ -278,7 +398,11 @@ class MainActivity : ComponentActivity() {
 
     /** 加到清單尾端；若目前沒在播放就直接從新加入的歌開始播。 */
     private fun appendItems(items: List<MediaItem>, forcePlay: Boolean = false) {
-        val c = player.controller ?: return
+        val c = player.controller
+        if (c == null) {
+            pendingItems += items
+            return
+        }
         val start = c.mediaItemCount
         c.addMediaItems(items)
         if (forcePlay || !c.isPlaying) {
@@ -320,6 +444,44 @@ class MainActivity : ComponentActivity() {
         appendItems(items)
     }
 
+    private fun scanFolder(tree: Uri) {
+        try {
+            contentResolver.takePersistableUriPermission(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        } catch (_: Exception) {
+        }
+        scanning = true
+        lifecycleScope.launch {
+            try {
+                val offer = withContext(Dispatchers.IO) { LocalScan.scan(this@MainActivity, tree) }
+                if (offer.files.isEmpty()) player.message = "「${offer.folderName}」裡沒有找到音樂或影片"
+                else folderOffer = offer
+            } catch (e: Exception) {
+                player.message = "無法讀取資料夾：${e.message ?: e.javaClass.simpleName}"
+            } finally {
+                scanning = false
+            }
+        }
+    }
+
+    fun acceptFolder(onlyAudio: Boolean) {
+        val offer = folderOffer ?: return
+        folderOffer = null
+        val files = if (onlyAudio) offer.files.filter { !it.isVideo } else offer.files
+        appendItems(files.map { f ->
+            Media.item(
+                "local:${f.uri}", f.uri,
+                f.name.substringBeforeLast('.').ifBlank { f.name },
+                if (f.isVideo) "本機影片・${offer.folderName}" else "本機音樂・${offer.folderName}",
+                null,
+            )
+        })
+    }
+
+    fun dismissCrash() {
+        crashLog = null
+        App.crashFile(this).delete()
+    }
+
     private fun displayName(uri: Uri): String {
         try {
             contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
@@ -333,6 +495,7 @@ class MainActivity : ComponentActivity() {
     // ---------------- 播放控制 ----------------
 
     fun togglePlay() {
+        stopPreview()
         val c = player.controller ?: return
         if (c.isPlaying) {
             c.pause()
@@ -344,6 +507,7 @@ class MainActivity : ComponentActivity() {
     }
 
     fun playAt(i: Int) {
+        stopPreview()
         val c = player.controller ?: return
         c.seekTo(i, 0)
         if (c.playbackState == Player.STATE_IDLE) c.prepare()

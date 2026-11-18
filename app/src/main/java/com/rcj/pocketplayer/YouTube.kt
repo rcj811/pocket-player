@@ -78,7 +78,11 @@ object YouTube {
         return Media.youtube(id, info.name, info.uploaderName ?: "")
     }
 
-    fun loadPlaylist(listId: String, limit: Int = 300): List<MediaItem> {
+    fun loadPlaylist(listId: String, limit: Int = 300): List<MediaItem> =
+        playlistTracks(listId, limit).map { Media.youtube(it.id, it.title, it.subtitle) }
+
+    /** 歌單 / 專輯裡的曲目（給搜尋頁展開試聽用）。 */
+    fun playlistTracks(listId: String, limit: Int = 300): List<Result> {
         val url = "https://www.youtube.com/playlist?list=$listId"
         val info = PlaylistInfo.getInfo(ServiceList.YouTube, url)
         val items = ArrayList<StreamInfoItem>(info.relatedItems)
@@ -92,7 +96,7 @@ object YouTube {
         }
         return items.take(limit).mapNotNull { si ->
             val vid = Links.videoId(si.url) ?: return@mapNotNull null
-            Media.youtube(vid, si.name, si.uploaderName ?: "")
+            Result(false, vid, si.name, si.uploaderName ?: "", si.duration, bestThumb(si.thumbnails))
         }
     }
 
@@ -100,6 +104,7 @@ object YouTube {
 
     enum class Kind(val label: String, val filter: String) {
         SONGS("歌曲", Q.MUSIC_SONGS),
+        ALBUMS("專輯", Q.MUSIC_ALBUMS),
         MUSIC_VIDEOS("MV", Q.MUSIC_VIDEOS),
         VIDEOS("影片", Q.VIDEOS),
         PLAYLISTS("歌單", Q.MUSIC_PLAYLISTS),
@@ -136,7 +141,7 @@ object YouTube {
         }
         is PlaylistInfoItem -> Links.playlistId(item.url)?.let { id ->
             val count = item.streamCount
-            val sub = listOfNotNull(item.uploaderName, if (count > 0) "$count 首" else null).joinToString(" · ")
+            val sub = listOfNotNull(item.uploaderName?.takeIf { it.isNotBlank() }, if (count > 0) "$count 首" else null).joinToString(" · ")
             Result(true, id, item.name, sub, -1, bestThumb(item.thumbnails))
         }
         else -> null

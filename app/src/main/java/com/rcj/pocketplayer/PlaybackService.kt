@@ -39,10 +39,12 @@ class PlaybackService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
 
-        // 跑步不卡頓：盡量把整首歌先緩衝進記憶體（最多 10 分鐘），1.5 秒就開始播
+        // 跑步不卡頓：音樂盡量整首先緩衝（最多 10 分鐘），但總量限制 40MB，
+        // 避免 MP4 影片把記憶體吃光而閃退
         val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(60_000, 600_000, 1_500, 3_000)
-            .setPrioritizeTimeOverSizeThresholds(true)
+            .setBufferDurationsMs(30_000, 600_000, 1_500, 3_000)
+            .setTargetBufferBytes(40 * 1024 * 1024)
+            .setPrioritizeTimeOverSizeThresholds(false)
             .build()
 
         player = ExoPlayer.Builder(this)
@@ -73,7 +75,11 @@ class PlaybackService : MediaSessionService() {
             .setCallback(callback)
             .build()
 
-        QueueStore.restore(this, player)
+        try {
+            QueueStore.restore(this, player)
+        } catch (e: Exception) {
+            QueueStore.clear(this)
+        }
 
         connectivity = getSystemService(ConnectivityManager::class.java)
         try {
@@ -236,6 +242,10 @@ private class PatientRetryPolicy : DefaultLoadErrorHandlingPolicy() {
 /** 記住播放清單與位置，下次開 App 接著聽。 */
 object QueueStore {
     private const val PREFS = "queue"
+
+    fun clear(context: Context) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().clear().commit()
+    }
 
     fun save(context: Context, player: Player) {
         val arr = JSONArray()
