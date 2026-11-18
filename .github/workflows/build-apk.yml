@@ -80,9 +80,9 @@ jobs:
             echo
             echo "### 更新內容"
             if [ -n "$PREV" ]; then
-              git log "$PREV"..HEAD --no-merges --pretty='- %s' | grep -v '^- CI ' || echo "- 例行重新編譯"
+              git log "$PREV"..${{ github.sha }} --no-merges --pretty='- %s' | grep -v '^- CI ' || echo "- 例行重新編譯"
             else
-              git log -1 --pretty='- %s'
+              git log -1 ${{ github.sha }} --pretty='- %s'
             fi
             echo
             echo "YouTube 解析引擎：NewPipeExtractor $(grep -oP 'NewPipeExtractor:\K[^"]+' app/build.gradle.kts)"
