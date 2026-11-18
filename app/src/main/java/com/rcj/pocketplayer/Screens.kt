@@ -183,6 +183,21 @@ fun AppRoot(a: MainActivity) {
 
 @Composable
 private fun Dialogs(a: MainActivity) {
+    if (a.confirmClear) {
+        AlertDialog(
+            onDismissRequest = { a.confirmClear = false },
+            title = { Text("清除播放清單？") },
+            text = { Text("將移除清單中全部 ${a.player.queue.size} 首，並停止播放。（離線下載的快取會保留）") },
+            confirmButton = {
+                Button(
+                    onClick = { a.confirmClear = false; a.clearQueue() },
+                    colors = ButtonDefaults.buttonColors(containerColor = Pink),
+                ) { Text("全部清除", fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = { TextButton(onClick = { a.confirmClear = false }) { Text("取消", color = Muted) } },
+        )
+        return
+    }
     a.crashLog?.let { log ->
         val clipboard = LocalClipboardManager.current
         AlertDialog(
@@ -295,6 +310,21 @@ fun PlayerScreen(a: MainActivity, pad: PaddingValues) {
         ),
     ) {
         item { Header(a) }
+        if (a.notifOff) item {
+            Surface(
+                color = Color(0x33FF7EA6), shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).clickable { a.openNotificationSettings() },
+            ) {
+                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(painterResource(R.drawable.ic_music), null, tint = Pink)
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("播放通知被關閉了", fontWeight = FontWeight.Bold)
+                        Text("所以狀態列看不到播放圖示。點這裡開啟「播放中」通知", color = Muted, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
         item { NowPlaying(a) }
         item { AddBar(a) }
         item {
@@ -304,6 +334,14 @@ fun PlayerScreen(a: MainActivity, pad: PaddingValues) {
                 Text("播放清單", fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 Spacer(Modifier.width(8.dp))
                 Text("${s.queue.size} 首", color = Muted, fontSize = 13.sp)
+                Spacer(Modifier.weight(1f))
+                if (s.queue.isNotEmpty()) {
+                    TextButton(onClick = { a.confirmClear = true }) {
+                        Icon(Icons.Default.Close, null, tint = Pink, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("一鍵清除", color = Pink, fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         }
         if (s.queue.isEmpty()) {
@@ -382,7 +420,12 @@ private fun Header(a: MainActivity) {
                 DropdownMenuItem(
                     text = { Text("清空播放清單") },
                     leadingIcon = { Icon(Icons.Default.Close, null) },
-                    onClick = { menu = false; a.clearQueue() },
+                    onClick = { menu = false; a.confirmClear = true },
+                )
+                DropdownMenuItem(
+                    text = { Text("播放通知設定（狀態列圖示）") },
+                    leadingIcon = { Icon(painterResource(R.drawable.ic_music), null) },
+                    onClick = { menu = false; a.openNotificationSettings() },
                 )
             }
         }

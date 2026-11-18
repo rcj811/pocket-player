@@ -1,6 +1,7 @@
 package com.rcj.pocketplayer
 
 import android.Manifest
+import android.app.NotificationManager
 import android.content.ComponentName
 import android.content.Intent
 import android.net.Uri
@@ -157,6 +158,11 @@ class MainActivity : ComponentActivity() {
         if (tree != null) scanFolder(tree)
     }
 
+    /** 一鍵清除確認框 */
+    var confirmClear by mutableStateOf(false)
+    /** 播放通知被關閉（狀態列不會有圖示） */
+    var notifOff by mutableStateOf(false)
+
     /** 上次閃退的錯誤內容（顯示給使用者回報） */
     var crashLog by mutableStateOf<String?>(null)
 
@@ -177,6 +183,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        refreshNotificationState()
         if (showWelcome && allPermissionsReady()) {
             showWelcome = false
             player.message = "背景播放已開啟 ✓ 關螢幕也會繼續播"
@@ -536,7 +543,36 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun refreshNotificationState() {
+        val nm = getSystemService(NotificationManager::class.java)
+        val ch = nm.getNotificationChannel(PlaybackService.CHANNEL_ID)
+        notifOff = needsNotificationPermission() || !nm.areNotificationsEnabled() ||
+            (ch != null && ch.importance < NotificationManager.IMPORTANCE_DEFAULT)
+    }
+
+    /** 直接打開「播放中」通知的設定頁 */
+    fun openNotificationSettings() {
+        if (needsNotificationPermission()) {
+            notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+            return
+        }
+        val nm = getSystemService(NotificationManager::class.java)
+        val intent = if (nm.areNotificationsEnabled() && nm.getNotificationChannel(PlaybackService.CHANNEL_ID) != null) {
+            Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                .putExtra(Settings.EXTRA_CHANNEL_ID, PlaybackService.CHANNEL_ID)
+        } else {
+            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+        }
+        try {
+            startActivity(intent)
+        } catch (_: Exception) {
+            startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
+        }
+    }
+
     fun clearQueue() {
+        player.controller?.stop()
         player.controller?.clearMediaItems()
         player.message = "已清空播放清單"
     }
