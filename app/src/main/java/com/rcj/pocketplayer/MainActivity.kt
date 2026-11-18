@@ -162,6 +162,8 @@ class MainActivity : ComponentActivity() {
     var confirmClear by mutableStateOf(false)
     /** 播放通知被關閉（狀態列不會有圖示） */
     var notifOff by mutableStateOf(false)
+    /** 「狀態列看不到音符？」提示卡（按「已看到」後不再顯示） */
+    var showStatusTip by mutableStateOf(false)
 
     /** 上次閃退的錯誤內容（顯示給使用者回報） */
     var crashLog by mutableStateOf<String?>(null)
@@ -174,6 +176,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         pendingIntent = intent
         showWelcome = !allPermissionsReady()
+        showStatusTip = !getSharedPreferences("ui", MODE_PRIVATE).getBoolean("statusTipDone", false)
         App.crashFile(this).takeIf { it.exists() }?.let { f ->
             crashLog = try { f.readText() } catch (_: Exception) { "（無法讀取錯誤內容）" }
         }
@@ -548,6 +551,32 @@ class MainActivity : ComponentActivity() {
         val ch = nm.getNotificationChannel(PlaybackService.CHANNEL_ID)
         notifOff = needsNotificationPermission() || !nm.areNotificationsEnabled() ||
             (ch != null && ch.importance < NotificationManager.IMPORTANCE_DEFAULT)
+    }
+
+    /**
+     * 直接打開系統的「通知與狀態列」設定（OPPO/realme/一加的「通知圖示」在這頁）。
+     * 各品牌入口不同，依序嘗試，最後退回系統設定首頁。
+     */
+    fun openStatusBarSettings() {
+        val candidates = listOf(
+            Intent("android.settings.NOTIFICATION_SETTINGS"),
+            Intent().setClassName("com.android.settings", "com.android.settings.Settings\$NotificationAppListActivity"),
+            Intent().setClassName("com.android.settings", "com.android.settings.Settings\$ConfigureNotificationSettingsActivity"),
+            Intent(Settings.ACTION_SETTINGS),
+        )
+        for (i in candidates) {
+            try {
+                startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                player.message = "請點「通知圖示」→ 選「顯示圖示」"
+                return
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    fun dismissStatusTip() {
+        showStatusTip = false
+        getSharedPreferences("ui", MODE_PRIVATE).edit().putBoolean("statusTipDone", true).apply()
     }
 
     /** 直接打開「播放中」通知的設定頁 */

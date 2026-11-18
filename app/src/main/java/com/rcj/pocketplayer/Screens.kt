@@ -310,6 +310,28 @@ fun PlayerScreen(a: MainActivity, pad: PaddingValues) {
         ),
     ) {
         item { Header(a) }
+        if (!a.notifOff && a.showStatusTip && s.queue.isNotEmpty()) item {
+            Surface(color = Card, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
+                Column(Modifier.padding(14.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(painterResource(R.drawable.ic_music), null, tint = Pink)
+                        Spacer(Modifier.width(10.dp))
+                        Text("播放時，狀態列左上角沒有音符？", fontWeight = FontWeight.Bold)
+                    }
+                    Text(
+                        "手機可能設成不顯示通知圖示。點「前往設定」→「通知圖示」→ 選「顯示圖示」。",
+                        color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp),
+                    )
+                    Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = a::dismissStatusTip) { Text("已看到了", color = Muted) }
+                        Spacer(Modifier.width(8.dp))
+                        Button(onClick = a::openStatusBarSettings, colors = ButtonDefaults.buttonColors(containerColor = Pink)) {
+                            Text("前往設定", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
         if (a.notifOff) item {
             Surface(
                 color = Color(0x33FF7EA6), shape = RoundedCornerShape(16.dp),
@@ -423,7 +445,12 @@ private fun Header(a: MainActivity) {
                     onClick = { menu = false; a.confirmClear = true },
                 )
                 DropdownMenuItem(
-                    text = { Text("播放通知設定（狀態列圖示）") },
+                    text = { Text("狀態列顯示音符圖示（系統設定）") },
+                    leadingIcon = { Icon(painterResource(R.drawable.ic_music), null) },
+                    onClick = { menu = false; a.openStatusBarSettings() },
+                )
+                DropdownMenuItem(
+                    text = { Text("隨身聽的播放通知設定") },
                     leadingIcon = { Icon(painterResource(R.drawable.ic_music), null) },
                     onClick = { menu = false; a.openNotificationSettings() },
                 )
