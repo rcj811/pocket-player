@@ -1,0 +1,20 @@
+### video id=1000000016 audio id=1000000017
+### 1 啟動
+pid=4844
+### 2 用隨身聽開 MP3
+播放狀態: state=PLAYING(3)
+pid=4844
+### 3 加入 MP4 並切過去
+播放狀態: state=PLAYING(3)
+pid=4844
+通知: importance=3 channel=playing 
+### 4 回桌面（背景播放）
+播放狀態: state=PLAYING(3)
+pid=4844
+### 5 重新開啟
+播放狀態: state=PLAYING(3)
+pid=4844
+### 6 強制關閉後重新開啟（還原清單）
+pid=5797
+閃退次數: 0
+播放器操作失敗: 0

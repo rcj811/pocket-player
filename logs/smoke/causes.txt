@@ -1,0 +1,13 @@
+11-18 12:39:06.421  1653  1988 E AmbientMusicServiceMana: Caused by: java.lang.reflect.InvocationTargetException
+11-18 12:39:06.421  1653  1988 E AmbientMusicServiceMana: Caused by: java.lang.IllegalStateException: No underlying SoundTriggerModule available
+11-18 12:39:15.837  5196  5241 I SemanticLocation: Caused by: android.system.ErrnoException: open failed: ENOENT (No such file or directory)
+11-18 12:39:15.865  5196  5241 I SemanticLocation: Caused by: android.system.ErrnoException: open failed: ENOENT (No such file or directory)
+11-18 12:39:16.767  5196  5332 W GLSUser : Caused by: avvw: Parse Proto Exception.
+11-18 12:39:16.767  5196  5332 W GLSUser : Caused by: dzfz: Protocol message contained an invalid tag (zero).
+11-18 12:39:20.497  1734  2612 W YouTubeMusic: Caused by: zvm: Precondition check failed.
+11-18 12:39:20.497  1734  2612 W YouTubeMusic: Caused by: efc
+11-18 12:39:24.026  5287  5535 W PeoplePU: Caused by: android.os.RemoteException: Remote stack trace:
+11-18 12:39:28.284  1753  1753 E A       : Caused by: com.google.android.apps.gsa.shared.speech.a.o: errorCode: 65586, engine: 2
+11-18 12:39:28.284  1753  1753 E A       : Caused by: com.google.android.apps.gsa.shared.speech.a.k: errorCode: 401, engine: 2
+11-18 12:39:32.657  5287  5592 W PeoplePU: Caused by: android.os.RemoteException: Remote stack trace:
+11-18 12:39:39.202  1753  1753 W A       : Caused by: DiscoverPrecheckException(precheckFailureReason=com.google.android.apps.search.googleapp.discover.w.a.c@ff2f13d)

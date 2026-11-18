@@ -1,0 +1,18 @@
+Current Notification Manager state:
+  Notification List:
+    NotificationRecord(0x0a9ba615: pkg=com.rcj.pocketplayer user=UserHandle{0} id=1001 tag=null importance=3 key=0|com.rcj.pocketplayer|1001|null|10192: Notification(channel=playing shortcut=null contentView=null vibrate=null sound=null defaults=0x0 flags=0x68 color=0x00000000 category=transport groupKey=media3_group_key actions=2 vis=PUBLIC))
+      uid=10192 userId=0
+      opPkg=com.rcj.pocketplayer
+      icon=Icon(typ=RESOURCE pkg=com.rcj.pocketplayer id=0x7f05005e)
+      flags=0x68
+      originalFlags=0x48
+      pri=0
+      key=0|com.rcj.pocketplayer|1001|null|10192
+      seen=false
+      groupKey=0|com.rcj.pocketplayer|g:media3_group_key
+      notification=
+            fullscreenIntent=null
+            contentIntent=PendingIntent{a1e4d2a: PendingIntentRecord{98d57e5 com.rcj.pocketplayer startActivity (allowlist: 51cda58:+30s0ms/0/NOTIFICATION_SERVICE/NotificationManagerService)}}
+            deleteIntent=PendingIntent{2e5d71b: PendingIntentRecord{21462ba com.rcj.pocketplayer startService (allowlist: 51cda58:+30s0ms/0/NOTIFICATION_SERVICE/NotificationManagerService)}}
+            number=0
+            groupAlertBehavior=0
